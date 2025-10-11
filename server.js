@@ -13,7 +13,6 @@ import userRoutes from "./routes/userRoutes.js";
 import userProfileRoutes from "./routes/userProfile.js";
 import cookieParser from "cookie-parser";
 import { addDirectAdmin } from "./controllers/adminController.js";
-
 import { scheduleCronJobs } from "./services/cronJob.js";
 import { auth } from "googleapis/build/src/apis/abusiveexperiencereport/index.js";
 
@@ -28,6 +27,7 @@ const corsOptions = {
     'http://localhost:3000',
     'https://localhost:3000',
     'http://localhost:5173',
+    'https://front-end-nu-sage.vercel.app'
   ],
   credentials: true,
   optionsSuccessStatus: 200,
@@ -48,6 +48,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // Enable pre-flight for all routes
 
 // Middlewares
 app.use(
@@ -57,10 +58,6 @@ app.use(
     },
   })
 );
-
-// Apply CORS middleware
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); 
 app.use(cookieParser());
 
 // Routes
@@ -79,7 +76,7 @@ app.use("/api/profile", userProfileRoutes);
 // Port
 const PORT = process.env.PORT || 5001;
 
-// Error handler
+// Sentry error handler
 app.use(Sentry.Handlers.errorHandler());
 
 // Function to initialize direct admin
@@ -121,7 +118,7 @@ const startServer = async () => {
     scheduleCronJobs();
 
     // Start the server
-    app.listen(PORT,'0.0.0.0', () => {
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server is running on port ${PORT}`);
       console.log("🎯 Direct Admin Credentials:");
       console.log("Email: AdminAbhisek@JobMela.com");
