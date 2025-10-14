@@ -102,7 +102,10 @@ const userProfileSchema = new mongoose.Schema({
       proficiency: String,
     },
   ],
-  resume: String,
+  resume: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null
+  },
   profilePicture: String,
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
