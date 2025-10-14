@@ -13,7 +13,6 @@ import userRoutes from "./routes/userRoutes.js";
 import userProfileRoutes from "./routes/userProfile.js";
 import cookieParser from "cookie-parser";
 import { addDirectAdmin } from "./controllers/adminController.js";
-import { scheduleCronJobs } from "./services/cronJob.js";
 import { auth } from "googleapis/build/src/apis/abusiveexperiencereport/index.js";
 
 // Initialize Express
@@ -113,9 +112,6 @@ const startServer = async () => {
 
     // Initialize direct admin after database connection
     await initializeDirectAdmin();
-
-    // Schedule cron jobs
-    scheduleCronJobs();
 
     // Start the server
     app.listen(PORT, '0.0.0.0', () => {
