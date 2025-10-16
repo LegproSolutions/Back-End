@@ -7,6 +7,7 @@ import User from "../models/User.js";
 import UserProfile from "../models/UserProfile.js";
 import JobApplication from "../models/JobApplication.js";
 import mongoose from "mongoose";
+import { v2 as cloudinary } from 'cloudinary';
 
 // Direct admin credentials constant
 const DIRECT_ADMIN = {
@@ -179,25 +180,6 @@ export const getAdminData = async (req, res) => {
   }
 };
 
-// unverifiedRecruiters 
-export const unverifiedRecruiters = async (req, res) => {
-  try {
-    const unverified = await Company.find({ isVerified: false }).select("-password"); // exclude password
-    res.json({ success: true, data: unverified });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// AllRecruiters 
-export const allRecruiters = async (req, res) => {
-  try {
-    const allRecruitersData = await Company.find().select("-password"); // exclude password
-    res.status(200).json({ success: true, recruiters: allRecruitersData });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
 // AllUser 
 export const allUser = async (req, res) => {
   try {
@@ -236,94 +218,191 @@ export const getUserProfileById = async (req, res) => {
 };
 
 
-// unverifiedPost
-// /api/admin/unverified-jobs
-
-export const unverifiedPost = async (req, res) => {
+// Create Job Post by Admin (with auto company creation)
+export const createJobByAdmin = async (req, res) => {
   try {
-    const jobs = await Job.find({ visible: true, isVerified: false })
-      .populate({ path: 'companyId', select: '-password' })
+    // Support both JSON and multipart/form-data
+    const body = req.body || {};
+    const file = req.file; // multer single('companyImage')
 
-    res.status(200).json({ success: true, jobs })
-  } catch (error) {
-    res.json({ success: false, message: error.message })
-  }
-}
+    const title = body.title;
+    const description = body.description || body.jobDescription; // rich text
+    const location = body.location;
+    const category = body.category;
+    const deadline = body.deadline;
+    const level = body.level;
+    const experience = body.experience;
+    const salary = body.salary;
+    const openings = body.openings;
+    const employmentType = body.employmentType;
+    const requirements = body.requirements ? (Array.isArray(body.requirements) ? body.requirements : [body.requirements]) : [];
 
-export const viewApplicant = async (req, res) => {
-  try {
-    const jobs = await Job.find({ visible: true, isVerified: false, viewApplicant: false })
-      .populate({ path: 'companyId', select: '-password' })
+    // Company details
+    const companyId = body.companyId;
+    const companyName = body.companyName || body["companyDetails[name]"]; // fallback if nested form keys used
+    const shortDescription = body.companyDescription || body.shortDescription || body["companyDetails[shortDescription]"]; // rich text
+    const city = body.companyCity || body.city || body["companyDetails[city]"];
+    const state = body.companyState || body.state || body["companyDetails[state]"];
+    const country = body.companyCountry || body.country || body["companyDetails[country]"];
+    const hrName = body.hrName || body["companyDetails[hrName]"];
+    const hrEmail = body.hrEmail || body.companyEmail || body["companyDetails[hrEmail]"];
+    const hrPhone = body.hrPhone || body.companyPhone || body["companyDetails[hrPhone]"];
+    const companyEmail = body.companyEmail || body["companyDetails[email]"]; 
+    const companyPhone = body.companyPhone || body["companyDetails[phone]"];
+    const companyPassword = body.companyPassword || body["companyDetails[password]"];
 
-    res.json({ success: true, jobs })
-  } catch (error) {
-    res.json({ success: false, message: error.message })
-  }
-}
+    let finalCompanyId;
+    let finalCompanyDetails;
 
-// controllers/jobController.js
-export const verifyJobByAdmin = async (req, res) => {
-  try {
-    const { jobId } = req.params;
-    const job = await Job.findById(jobId);
-    if (!job) {
-      return res.status(404).json({ success: false, message: "Job not found" });
+    // Check if company ID is provided (existing company)
+    if (companyId) {
+      const existingCompany = await Company.findById(companyId);
+      if (!existingCompany) {
+        return res.status(404).json({
+          success: false,
+          message: "Selected company not found"
+        });
+      }
+      finalCompanyId = companyId;
+      finalCompanyDetails = {
+        name: existingCompany.name,
+        shortDescription: shortDescription || `${existingCompany.name} is a leading company`,
+        city,
+        state,
+        country,
+        hrName: hrName || existingCompany.name,
+        hrEmail: hrEmail || existingCompany.email,
+        hrPhone: hrPhone || existingCompany.phone
+      };
+    } else {
+      // Create new company if it doesn't exist
+      const existingCompany = await Company.findOne({ 
+        $or: [
+          { email: companyEmail },
+          { name: companyName }
+        ]
+      });
+
+      if (existingCompany) {
+        // Use existing company
+        finalCompanyId = existingCompany._id;
+        finalCompanyDetails = {
+          name: existingCompany.name,
+          shortDescription: shortDescription || `${existingCompany.name} is a leading company`,
+          city,
+          state,
+          country,
+          hrName: hrName || existingCompany.name,
+          hrEmail: hrEmail || existingCompany.email,
+          hrPhone: hrPhone || existingCompany.phone
+        };
+      } else {
+        // Create new company
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(companyPassword || 'DefaultPass123!', salt);
+
+        // Upload logo to Cloudinary if provided
+        let imageUrl = 'https://cdn.iconscout.com/icon/premium/png-256-thumb/building-icon-svg-download-png-1208046.png?f=webp&w=128';
+        if (file && file.buffer) {
+          const uploadRes = await cloudinary.uploader.upload_stream(
+            { folder: 'companies', resource_type: 'image' },
+            (error, result) => {
+              if (error) throw error;
+            }
+          );
+          // Using promise wrapper for upload_stream
+        }
+
+        // cloudinary upload_stream needs a promise wrapper; fallback to upload if file.path exists (disk storage not used here)
+        if (file && file.buffer) {
+          const uploadResult = await new Promise((resolve, reject) => {
+            const stream = cloudinary.uploader.upload_stream({ folder: 'companies', resource_type: 'image' }, (err, result) => {
+              if (err) return reject(err);
+              resolve(result);
+            });
+            stream.end(file.buffer);
+          });
+          imageUrl = uploadResult?.secure_url || imageUrl;
+        }
+
+        const newCompany = await Company.create({
+          name: companyName,
+          email: companyEmail,
+          phone: companyPhone,
+          image: imageUrl,
+          password: hashedPassword,
+          isVerified: true // Auto-verify since admin is creating
+        });
+
+        finalCompanyId = newCompany._id;
+        finalCompanyDetails = {
+          name: companyName,
+          shortDescription: shortDescription || `${companyName} is a leading company`,
+          city,
+          state,
+          country,
+          hrName: hrName || companyName,
+          hrEmail: hrEmail || companyEmail,
+          hrPhone: hrPhone || companyPhone
+        };
+      }
     }
-    job.isVerified = true;
-    await job.save();
-    res.status(200).json({
+
+    // Create the job post
+    const job = await Job.create({
+      title,
+      description,
+      location,
+      category,
+      deadline: new Date(deadline),
+      level,
+      experience,
+      salary,
+      openings,
+      date: new Date(),
+      requirements: Array.isArray(requirements) ? requirements : [requirements],
+      employmentType,
+      companyId: finalCompanyId,
+      companyDetails: finalCompanyDetails,
+      visible: true,
+      isVerified: true, // Auto-verify since admin is creating
+      isViewApplicant: false
+    });
+
+    // Populate company details in response
+    const populatedJob = await Job.findById(job._id).populate('companyId', 'name email phone image isVerified');
+
+    res.status(201).json({
       success: true,
-      message: "Job verified successfully",
-      job,
+      message: "Job created successfully by admin",
+      job: populatedJob
     });
+
   } catch (error) {
-    console.error("Error verifying job:", error);
-    return res.status(500).json({
+    console.error("Error creating job by admin:", error);
+    res.status(500).json({
       success: false,
-      message: "Internal Server Error",
+      message: error.message
     });
   }
 };
 
-
-//VerifyRecruiter
-// 
-
-export const verifyRecruiter = async (req, res) => {
+// Get all companies for dropdown selection
+export const getAllCompanies = async (req, res) => {
   try {
-    const { recruiterId } = req.params;
+    const companies = await Company.find({}, 'name email phone image isVerified')
+      .sort({ name: 1 });
 
-    const recruiter = await Company.findById(recruiterId);
-    if (!recruiter) {
-      return res.status(404).json({ success: false, message: "Recruiter not found" });
-    }
-
-    recruiter.isVerified = true;
-    await recruiter.save();
-
-    res.json({ success: true, message: "Recruiter verified successfully" });
+    res.json({
+      success: true,
+      companies
+    });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-
-// Toggle Access 
-export const TogglePremiumAccessRecruiter = async (req, res) => {
-  try {
-    const { recruiterId } = req.params;
-
-    const recruiter = await Company.findById(recruiterId);
-    if (!recruiter) {
-      return res.status(404).json({ success: false, message: "Recruiter not found" });
-    }
-
-    recruiter.havePremiumAccess = !recruiter.havePremiumAccess;
-    await recruiter.save();
-
-    res.json({ success: true, message: "Updated premium access" });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Error fetching companies:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
   }
 };
 
@@ -473,5 +552,55 @@ export const getCompanyJobApplicants = async (req, res) => {
   }
 };
 
-// Credit system removed
+
+// NEW: Update Job by Admin
+export const updateJobByAdmin = async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const body = req.body || {};
+
+    const allowedFields = [
+      "title",
+      "description",
+      "location",
+      "category",
+      "deadline",
+      "level",
+      "experience",
+      "salary",
+      "openings",
+      "employmentType",
+      "requirements",
+      "visible",
+    ];
+
+    const update = {};
+    for (const key of allowedFields) {
+      if (body[key] !== undefined) update[key] = body[key];
+    }
+
+    // Normalize some fields
+    if (update.deadline) update.deadline = new Date(update.deadline);
+    if (update.experience !== undefined) update.experience = parseInt(update.experience);
+    if (update.salary !== undefined) update.salary = parseInt(update.salary);
+    if (update.openings !== undefined) update.openings = parseInt(update.openings);
+    if (update.requirements && !Array.isArray(update.requirements)) {
+      update.requirements = [update.requirements];
+    }
+
+    const updatedJob = await Job.findByIdAndUpdate(jobId, update, {
+      new: true,
+      runValidators: true,
+    }).populate('companyId', 'name email phone image isVerified');
+
+    if (!updatedJob) {
+      return res.status(404).json({ success: false, message: "Job not found" });
+    }
+
+    return res.json({ success: true, message: "Job updated successfully", job: updatedJob });
+  } catch (error) {
+    console.error("Error updating job by admin:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
 

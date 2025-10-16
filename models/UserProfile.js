@@ -2,12 +2,12 @@ import mongoose from "mongoose";
 
 const educationFieldSchema = new mongoose.Schema(
   {
-    instituteType: { type: String, required: true },
+    instituteType: { type: String },
     instituteFields: {
-      instituteName: { type: String, required: true },
-      certificationBody: { type: String, required: true },
-      passingYear: { type: Number, required: true },
-      percentage: { type: Number, required: true },
+      instituteName: { type: String },
+      certificationBody: { type: String },
+      passingYear: { type: Number },
+      percentage: { type: Number },
       courseType: { type: String },
       courseDuration: { type: Number },
       specialization: { type: String },
@@ -19,17 +19,17 @@ const educationFieldSchema = new mongoose.Schema(
 );
 
 const userProfileSchema = new mongoose.Schema({
-  userId: { type: String, ref: "User", required: true },
+  userId: { type: String, ref: "User" },
   
   // Basic personal information
-  firstName: { type: String, required: true },
-  lastName: { type: String, required: true },
+  firstName: { type: String },
+  lastName: { type: String },
   middleName: { type: String },
-  email: { type: String, required: true },
-  phone: { type: String, required: true },
+  email: { type: String },
+  phone: { type: String },
   alternatePhone: { type: String },
-  dateOfBirth: { type: Date, required: true },
-  gender: { type: String, required: true },
+  dateOfBirth: { type: Date },
+  gender: { type: String },
   maritalStatus: { type: String },
   nationality: { type: String, default: "Indian" },
   fatherName: { type: String },

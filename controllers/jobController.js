@@ -1,4 +1,5 @@
 import Job from "../models/Job.js";
+import Company from "../models/Company.js";
 // Redis disabled for now
 // import { redisClient } from "../utils/redisClient.js";
 
@@ -6,7 +7,6 @@ import Job from "../models/Job.js";
 export const getJobs = async (req, res) => {
   try {
     const {
-      type,
       page = 1,
       limit = 9,
       title,
@@ -29,9 +29,7 @@ export const getJobs = async (req, res) => {
       isVerified: true
      };
 
-    if (type && type !== "") {
-      filter.jobType = type;
-    }
+    // jobType removed from schema; no type filter
 
     if (title && title !== "") {
       filter.title = { $regex: title, $options: "i" };
@@ -68,7 +66,6 @@ export const getJobs = async (req, res) => {
 
     // Create cache key based on all filters
     const cacheKey = `jobs_${JSON.stringify({
-      type,
       page: pageNum,
       limit: limitNum,
       title,
@@ -147,5 +144,33 @@ export const getJobById = async (req, res) => {
     });
   } catch (error) {
     res.json({ success: false, message: error.message });
+  }
+};
+
+// Get companies with their jobs using aggregation
+export const getCompaniesWithJobs = async (req, res) => {
+  try {
+    // Use aggregation to join companies with their jobs in one query.
+    const companiesWithJobs = await Company.aggregate([
+      {
+        $lookup: {
+          from: "jobs", // This should match the collection name (typically the pluralized, lower-case version)
+          localField: "_id",
+          foreignField: "companyId",
+          as: "jobs",
+        },
+      },
+    ]);
+
+    res.json({
+      success: true,
+      jobs: companiesWithJobs,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error fetching companies and jobs",
+      error: error.message,
+    });
   }
 };

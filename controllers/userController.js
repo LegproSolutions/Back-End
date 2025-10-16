@@ -40,7 +40,15 @@ export const registerUser = async (req, res) => {
       password: hashedPassword,
     });
 
+    const newUserProfile = new UserProfile({
+      userId: newUser._id,
+      firstName: name.split(" ")[0] || name,
+      lastName: name.split(" ")[1] || '',
+      email,
+    });
+
     await newUser.save();
+    await newUserProfile.save();
 
     // Generate JWT token (expires in 1 day)
     const token = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET, {
@@ -171,6 +179,14 @@ export const googleAuth = async (req, res) => {
         email,
         image: picture,
       });
+
+      const newUserProfile = new UserProfile({
+        userId: user._id,
+        firstName: name.split(" ")[0] || name,
+        lastName: name.split(" ")[1] || '',
+        email,
+      });
+      await newUserProfile.save();
     }
 
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
