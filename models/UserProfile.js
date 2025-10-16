@@ -20,21 +20,21 @@ const educationFieldSchema = new mongoose.Schema(
 
 const userProfileSchema = new mongoose.Schema({
   userId: { type: String, ref: "User" },
-  
+
   // Basic personal information
   firstName: { type: String },
   lastName: { type: String },
   middleName: { type: String },
-  email: { type: String },
-  phone: { type: String },
-  alternatePhone: { type: String },
+  email: { type: String, unique: true },
+  phone: { type: String, unique: true },
+  alternatePhone: { type: String, unique: true },
   dateOfBirth: { type: Date },
   gender: { type: String },
   maritalStatus: { type: String },
   nationality: { type: String, default: "Indian" },
   fatherName: { type: String },
   aadharNumber: { type: String },
-  
+
   // Address information
   address: {
     street: String,
@@ -52,14 +52,14 @@ const userProfileSchema = new mongoose.Schema({
     pincode: String,
     landmark: String,
   },
-  
+
   // Education (Map structure)
   education: {
     type: Map,
     of: educationFieldSchema,
     default: {},
   },
-  
+
   // Experience array
   experience: [
     {
@@ -70,7 +70,7 @@ const userProfileSchema = new mongoose.Schema({
       description: String,
     },
   ],
-  
+
   // Professional Information
   professional: {
     currentJobTitle: String,
@@ -84,17 +84,17 @@ const userProfileSchema = new mongoose.Schema({
     industryExperience: [String],
     availableFrom: String,
   },
-  
+
   // Skills (basic array for backward compatibility)
   skills: [String],
-  
+
   // Detailed skills breakdown
   skillsDetailed: {
     technical: [String],
     soft: [String],
     certifications: [String],
   },
-  
+
   // Languages
   languages: [
     {
@@ -102,26 +102,28 @@ const userProfileSchema = new mongoose.Schema({
       proficiency: String,
     },
   ],
-  
+
   // Documents
   documents: {
     resume: mongoose.Schema.Types.Mixed,
     profilePicture: mongoose.Schema.Types.Mixed,
     portfolio: mongoose.Schema.Types.Mixed,
   },
-  
+
   // Social Media and Portfolio Links
   socialLinks: {
     linkedin: String,
     github: String,
     portfolio: String,
     website: String,
-    other: [{
-      platform: String,
-      url: String,
-    }],
+    other: [
+      {
+        platform: String,
+        url: String,
+      },
+    ],
   },
-  
+
   // Job Preferences
   preferences: {
     jobTypes: [String],
@@ -129,14 +131,14 @@ const userProfileSchema = new mongoose.Schema({
     disabilities: String,
     careerObjective: String,
   },
-  
+
   // Backward compatibility fields
   resume: {
     type: mongoose.Schema.Types.Mixed,
-    default: null
+    default: null,
   },
   profilePicture: String,
-  
+
   // Timestamps
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },

@@ -183,7 +183,7 @@ export const getAdminData = async (req, res) => {
 // AllUser 
 export const allUser = async (req, res) => {
   try {
-    const allUserData = await User.find().select("-password");
+    const allUserData = await UserProfile.find().select("-password");
     res.status(200).json({ success: true, users: allUserData });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -525,7 +525,7 @@ export const getCompanyJobApplicants = async (req, res) => {
 
     // Find job applications for the given jobId
     const applications = await JobApplication.find({ jobId })
-      .populate("userId", "name image resume email") // Populate user details (name, image, resume, email)
+      .populate("userId", "name image resume email phone") // Populate user details (name, image, resume, email)
       .populate("jobId", "title location category level salary") // Populate job details
       .exec();
 

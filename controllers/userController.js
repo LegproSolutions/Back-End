@@ -6,27 +6,36 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import streamifier from "streamifier";
 import UserProfile from "../models/UserProfile.js";
-import { OAuth2Client } from 'google-auth-library';
+import { OAuth2Client } from "google-auth-library";
 
 //register
 export const registerUser = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, phone, password } = req.body;
 
     // Validate required fields
-    if (!name || !email || !password) {
+    if (!name || !email || !phone || !password) {
       return res.status(400).json({
         success: false,
         message: "Please provide all required fields",
       });
     }
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
+    // Check if email or phone is already taken
+    const existingUser = await User.findOne({
+      $or: [{ email }, { phone }],
+    });
+
     if (existingUser) {
-      return res
-        .status(400)
-        .json({ success: false, message: "User already exists" });
+      let msg =
+        existingUser.email === email
+          ? "Email is already registered"
+          : "Phone number is already registered";
+
+      return res.status(400).json({
+        success: false,
+        message: msg,
+      });
     }
 
     // Hash the password
@@ -37,14 +46,16 @@ export const registerUser = async (req, res) => {
     const newUser = new User({
       name,
       email,
+      phone,
       password: hashedPassword,
     });
 
     const newUserProfile = new UserProfile({
       userId: newUser._id,
       firstName: name.split(" ")[0] || name,
-      lastName: name.split(" ")[1] || '',
+      lastName: name.split(" ")[1] || "",
       email,
+      phone,
     });
 
     await newUser.save();
@@ -70,6 +81,7 @@ export const registerUser = async (req, res) => {
         id: newUser._id,
         name: newUser.name,
         email: newUser.email,
+        phone: newUserProfile.phone,
       },
       message: "User registered successfully",
     });
@@ -100,12 +112,11 @@ export const loginUser = async (req, res) => {
 
     // Check if user has a password (Google users might not have one)
     if (!user.password) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "This account was created with Google. Please use Google Sign-In."
-        });
+      return res.status(400).json({
+        success: false,
+        message:
+          "This account was created with Google. Please use Google Sign-In.",
+      });
     }
 
     // Validate that both password values exist before comparison
@@ -156,11 +167,10 @@ export const googleAuth = async (req, res) => {
   const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
   const { code } = req.body;
   try {
-
     const oAuth2Client = new OAuth2Client(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
-      'postmessage'
+      "postmessage"
     );
 
     const { tokens } = await oAuth2Client.getToken(code);
@@ -183,21 +193,21 @@ export const googleAuth = async (req, res) => {
       const newUserProfile = new UserProfile({
         userId: user._id,
         firstName: name.split(" ")[0] || name,
-        lastName: name.split(" ")[1] || '',
+        lastName: name.split(" ")[1] || "",
         email,
       });
       await newUserProfile.save();
     }
 
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
-      expiresIn: '1d',
+      expiresIn: "1d",
     });
 
     return res
-      .cookie('token', token, {
+      .cookie("token", token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
         maxAge: 7 * 24 * 60 * 60 * 1000,
       })
       .status(200)
@@ -209,13 +219,13 @@ export const googleAuth = async (req, res) => {
           email: user.email,
           image: user.image || null,
         },
-        message: 'Google login successful',
+        message: "Google login successful",
       });
   } catch (err) {
-    console.error('Google Auth Error:', err);
+    console.error("Google Auth Error:", err);
     res.status(500).json({
       success: false,
-      message: 'Google authentication failed',
+      message: "Google authentication failed",
       error: err.message,
     });
   }
@@ -228,7 +238,9 @@ export const getUserData = async (req, res) => {
     // No need to query database again
     const user = req.user;
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
     res.json({ success: true, user });
   } catch (error) {
@@ -344,7 +356,6 @@ export const updateUserResume = async (req, res) => {
       userProfile.resume = uploadResult.secure_url;
       await userProfile.save();
     }
-
 
     return res.json({ success: true, message: "Resume Updated" });
   } catch (error) {
