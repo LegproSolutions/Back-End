@@ -22,6 +22,7 @@ const corsOptions = {
   origin: [
     'https://jobmela.com',
     'https://www.jobmela.com',
+    'https://www.jobmela.co.in', // <-- Added new domain
     'http://localhost:3000',
     'https://localhost:3000',
     'http://localhost:5173',
