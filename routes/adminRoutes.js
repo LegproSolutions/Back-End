@@ -13,6 +13,8 @@ import {
   getCompanyPostedJobs,
   getCompanyJobApplicants,
   updateJobByAdmin,
+  getJobApplicationStats,
+  changeApplicationStatus,
 } from "../controllers/adminController.js";
 import { protectAdmin } from "../middleware/authMiddleware.js";
 import upload from "../config/multer.js";
@@ -47,6 +49,12 @@ router.get("/job-applicants/:jobId", protectAdmin, getCompanyJobApplicants);
 
 // Route: Update job by admin
 router.put("/jobs/:jobId", protectAdmin, updateJobByAdmin);
+
+// Routes: Accept and reject job applications
+router.put("/applications/:applicationId/status", protectAdmin, changeApplicationStatus);
+
+// Route: Get application statistics for a job (optional)
+router.get("/job-stats/:jobId", protectAdmin, getJobApplicationStats);
 
 // Route: Delete job by admin
 router.delete("/jobs/:jobId", protectAdmin, async (req, res) => {

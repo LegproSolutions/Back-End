@@ -527,6 +527,7 @@ export const getCompanyJobApplicants = async (req, res) => {
     const applications = await JobApplication.find({ jobId })
       .populate("userId", "name image resume email phone") // Populate user details (name, image, resume, email)
       .populate("jobId", "title location category level salary") // Populate job details
+      .populate("reviewedBy", "name email") // Populate admin who reviewed
       .exec();
 
     if (!applications || applications.length === 0) {
@@ -536,12 +537,16 @@ export const getCompanyJobApplicants = async (req, res) => {
       });
     }
 
-    // Normalize the applicationData field if it has extra nesting
+    // Normalize the applicationData field if it has extra nesting and add status info
     const normalizedApplications = applications.map((app) => {
       const appObj = app.toObject();
       if (appObj.applicationData && appObj.applicationData.applicationData) {
         appObj.applicationData = appObj.applicationData.applicationData;
       }
+      
+      // Ensure status is lowercase for frontend consistency
+      appObj.status = appObj.status ? appObj.status.toLowerCase() : 'pending';
+      
       return appObj;
     });
 
@@ -601,6 +606,111 @@ export const updateJobByAdmin = async (req, res) => {
   } catch (error) {
     console.error("Error updating job by admin:", error);
     return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Accept job application
+export const changeApplicationStatus = async (req, res) => {
+  try {
+    const { applicationId } = req.params;
+    const { status } = req.body;
+
+    // Validate applicationId
+    if (!mongoose.isValidObjectId(applicationId)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid application ID" 
+      });
+    }
+
+    // Find and update the application status
+    const application = await JobApplication.findByIdAndUpdate(
+      applicationId,
+      { 
+        status: status,
+        reviewedBy: req.admin.id,
+        reviewedAt: new Date()
+      },
+      { 
+        new: true,
+        runValidators: true 
+      }
+    ).populate('userId', 'name email phone')
+     .populate('jobId', 'title companyId');
+
+    if (!application) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Application not found" 
+      });
+    }
+
+    // Optional: Send email notification to applicant (implement if needed)
+    // await sendAcceptanceEmail(application.userId.email, application.jobId.title);
+
+    return res.json({
+      success: true,
+      message: "Application accepted successfully",
+      application
+    });
+
+  } catch (error) {
+    console.error("Error accepting application:", error);
+    return res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
+  }
+};
+
+// Get application status statistics for a job (optional utility function)
+export const getJobApplicationStats = async (req, res) => {
+  try {
+    const { jobId } = req.params;
+
+    // Validate jobId
+    if (!mongoose.isValidObjectId(jobId)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid job ID" 
+      });
+    }
+
+    // Get application statistics
+    const stats = await JobApplication.aggregate([
+      { $match: { jobId: new mongoose.Types.ObjectId(jobId) } },
+      {
+        $group: {
+          _id: "$status",
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // Format the results
+    const formattedStats = {
+      total: 0,
+      pending: 0,
+      accepted: 0,
+      rejected: 0
+    };
+
+    stats.forEach(stat => {
+      formattedStats.total += stat.count;
+      formattedStats[stat._id || 'pending'] = stat.count;
+    });
+
+    return res.json({
+      success: true,
+      stats: formattedStats
+    });
+
+  } catch (error) {
+    console.error("Error getting application stats:", error);
+    return res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
   }
 };
 
