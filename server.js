@@ -12,44 +12,43 @@ import userRoutes from "./routes/userRoutes.js";
 import userProfileRoutes from "./routes/userProfile.js";
 import cookieParser from "cookie-parser";
 import { addDirectAdmin } from "./controllers/adminController.js";
-import { auth } from "googleapis/build/src/apis/abusiveexperiencereport/index.js";
 
 // Initialize Express
 const app = express();
 
-// CORS configuration
+// ✅ CORS Configuration
 const corsOptions = {
   origin: [
-    'https://jobmela.com',
-    'https://www.jobmela.com',
-    'https://www.jobmela.co.in', // <-- Added new domain
-    'http://localhost:3000',
-    'https://localhost:3000',
-    'http://localhost:5173',
-    'https://front-end-nu-sage.vercel.app'
+    "https://jobmela.com",
+    "https://www.jobmela.com",
+    "https://www.jobmela.co.in",
+    "http://localhost:3000",
+    "https://localhost:3000",
+    "http://localhost:5173",
+    "https://front-end-nu-sage.vercel.app"
   ],
   credentials: true,
-  optionsSuccessStatus: 200,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
   allowedHeaders: [
-    'Authorization', 
-    'Content-Type', 
-    'Accept', 
-    'Origin', 
-    'User-Agent', 
-    'DNT', 
-    'Cache-Control', 
-    'X-Mx-ReqToken', 
-    'Keep-Alive', 
-    'X-Requested-With', 
-    'If-Modified-Since'
+    "Authorization",
+    "Content-Type",
+    "Accept",
+    "Origin",
+    "User-Agent",
+    "DNT",
+    "Cache-Control",
+    "X-Mx-ReqToken",
+    "Keep-Alive",
+    "X-Requested-With",
+    "If-Modified-Since"
   ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH']
+  optionsSuccessStatus: 200,
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // Enable pre-flight for all routes
+app.options('*', cors()); // Enable pre-flight for all routes
 
-// Middlewares
+// ✅ Middlewares
 app.use(
   express.json({
     verify: (req, res, buf) => {
@@ -59,34 +58,33 @@ app.use(
 );
 app.use(cookieParser());
 
-// Routes
-app.get("/", (req, res) => res.send("API Working"));
+// ✅ Routes
+app.get("/", (req, res) => res.send("🚀 JobMela API is Live!"));
 app.get("/api/test", (req, res) => {
-  res.json({ success: true, message: "Backend API is working!" });
+  res.json({ success: true, message: "Backend API is working fine!" });
 });
 
-// API Routes
 app.use("/api/admin", adminRoutes);
 app.use("/api/jobs", jobRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/profile", userProfileRoutes);
 
-// Port
-const PORT = process.env.PORT || 5001;
-
-// Sentry error handler
+// ✅ Sentry Error Handler (optional but good practice)
 app.use(Sentry.Handlers.errorHandler());
 
-// Function to initialize direct admin
+// ✅ Port Configuration
+const PORT = process.env.PORT || 5001;
+
+// ✅ Initialize direct admin
 const initializeDirectAdmin = async () => {
   try {
     console.log("🔧 Initializing direct admin...");
     const result = await addDirectAdmin();
 
     if (result.success) {
-      console.log("✅ Direct admin created successfully!");
-      console.log(`📧 Email: AdminAbhisek@JobMela.com`);
-      console.log(`🔑 Password: Pass1125@`);
+      console.log("✅ Direct admin initialized successfully!");
+      console.log(`📧 Email: ${process.env.ADMIN_EMAIL || "AdminAbhisek@JobMela.com"}`);
+      console.log(`🔑 Default password set in environment file.`);
     } else {
       console.log("ℹ️ Direct admin initialization:", result.message);
     }
@@ -95,30 +93,20 @@ const initializeDirectAdmin = async () => {
   }
 };
 
-// Start server with async initialization
+// ✅ Start Server
 const startServer = async () => {
   try {
-    // Connect to database
     await connectDB();
-    console.log("✅ Database connected successfully");
+    console.log("✅ MongoDB connected successfully");
 
-    // Connect to Cloudinary
     await connectCloudinary();
     console.log("✅ Cloudinary connected successfully");
 
-    // Redis disabled for now
-    // await connectRedis();
-
-    // Initialize direct admin after database connection
     await initializeDirectAdmin();
 
-    // Start the server
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`🚀 Server is running on port ${PORT}`);
-      console.log("🎯 Direct Admin Credentials:");
-      console.log("Email: AdminAbhisek@JobMela.com");
-      console.log("Password: Pass1125@");
-      console.log("PassKey: NAVGAP2025BJ");
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`🚀 Server running at: http://localhost:${PORT}`);
+      console.log("📡 Ready to accept requests from frontend!");
     });
   } catch (error) {
     console.error("❌ Failed to start server:", error);
