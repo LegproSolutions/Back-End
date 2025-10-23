@@ -3,14 +3,14 @@ import Company from "../models/Company.js";
 import User from "../models/User.js";
 import Admin from "../models/Admin.js";
 
-// Utility function to extract token from request
+// Utility function to extract token from request (Authorization header fallback)
 const extractToken = (req) => {
-  // Check for token in Authorization header
-  // if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-  //   return req.headers.authorization.split(' ')[1];
-  // }
-  // Check for token in cookies
-  return req.cookies.token;
+  // Prefer Authorization Bearer if present
+  if (req.headers?.authorization?.startsWith('Bearer ')) {
+    return req.headers.authorization.split(' ')[1];
+  }
+  // Fallback to httpOnly cookie
+  return req.cookies?.token;
 };
 
 // Generic authentication middleware

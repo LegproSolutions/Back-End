@@ -74,9 +74,10 @@ export const registerUser = async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
     });
 
-    // Send token in response
+    // Send token in response too (for frontend header-based auth)
     res.status(201).json({
       success: true,
+      token,
       user: {
         id: newUser._id,
         name: newUser.name,
@@ -147,9 +148,10 @@ export const loginUser = async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
     });
 
-    // Send success response
+    // Send success response (include token to allow header-based auth)
     res.json({
       success: true,
+      token,
       user: {
         id: user._id,
         name: user.name,
@@ -213,6 +215,7 @@ export const googleAuth = async (req, res) => {
       .status(200)
       .json({
         success: true,
+        token,
         user: {
           id: user._id,
           name: user.name,
