@@ -13,20 +13,29 @@ import userProfileRoutes from "./routes/userProfile.js";
 import cookieParser from "cookie-parser";
 import { addDirectAdmin } from "./controllers/adminController.js";
 
-// Initialize Express
 const app = express();
 
-// ✅ CORS Configuration
+// ✅ Trusted Frontend Origins
+const allowedOrigins = [
+  "https://www.jobmela.co.in", // main domain
+  "https://jobmela.co.in", // without www
+  "https://jobmela.com",
+  "https://www.jobmela.com",
+  "http://localhost:3000",
+  "http://localhost:5173",
+];
+
+// ✅ Secure CORS Setup
 const corsOptions = {
-  origin: [
-    "https://jobmela.com",
-    "https://www.jobmela.com",
-    "https://www.jobmela.co.in",
-    "http://localhost:3000",
-    "https://localhost:3000",
-    "http://localhost:5173",
-    "https://front-end-nu-sage.vercel.app"
-  ],
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true); // Allow mobile apps/postman
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`❌ CORS blocked for origin: ${origin}`);
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
   allowedHeaders: [
@@ -40,15 +49,15 @@ const corsOptions = {
     "X-Mx-ReqToken",
     "Keep-Alive",
     "X-Requested-With",
-    "If-Modified-Since"
+    "If-Modified-Since",
   ],
   optionsSuccessStatus: 200,
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors()); // Enable pre-flight for all routes
+app.options("*", cors(corsOptions)); // Enable preflight
 
-// ✅ Middlewares
+// ✅ Middleware Config
 app.use(
   express.json({
     verify: (req, res, buf) => {
@@ -58,24 +67,36 @@ app.use(
 );
 app.use(cookieParser());
 
-// ✅ Routes
-app.get("/", (req, res) => res.send("🚀 JobMela API is Live!"));
-app.get("/api/test", (req, res) => {
-  res.json({ success: true, message: "Backend API is working fine!" });
+// ✅ Optional: Redirect HTTP → HTTPS
+app.use((req, res, next) => {
+  if (
+    process.env.NODE_ENV === "production" &&
+    req.headers["x-forwarded-proto"] !== "https"
+  ) {
+    return res.redirect("https://" + req.headers.host + req.url);
+  }
+  next();
 });
 
+// ✅ Test Routes
+app.get("/", (req, res) => res.send("🚀 JobMela API is Live!"));
+app.get("/api/test", (req, res) =>
+  res.json({ success: true, message: "Backend API working fine!" })
+);
+
+// ✅ API Routes
 app.use("/api/admin", adminRoutes);
 app.use("/api/jobs", jobRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/profile", userProfileRoutes);
 
-// ✅ Sentry Error Handler (optional but good practice)
+// ✅ Sentry Error Handler (optional but recommended)
 app.use(Sentry.Handlers.errorHandler());
 
-// ✅ Port Configuration
+// ✅ Port
 const PORT = process.env.PORT || 5001;
 
-// ✅ Initialize direct admin
+// ✅ Initialize Direct Admin Account
 const initializeDirectAdmin = async () => {
   try {
     console.log("🔧 Initializing direct admin...");
@@ -84,7 +105,8 @@ const initializeDirectAdmin = async () => {
     if (result.success) {
       console.log("✅ Direct admin initialized successfully!");
       console.log(`📧 Email: ${process.env.ADMIN_EMAIL || "AdminAbhisek@JobMela.com"}`);
-      console.log(`🔑 Default password set in environment file.`);
+      console.log(`🔑 Password: ${process.env.ADMIN_PASSWORD || "Pass1125@"}`);
+      console.log("🪪 PassKey: NAVGAP2025BJ");
     } else {
       console.log("ℹ️ Direct admin initialization:", result.message);
     }
@@ -105,8 +127,10 @@ const startServer = async () => {
     await initializeDirectAdmin();
 
     app.listen(PORT, "0.0.0.0", () => {
-      console.log(`🚀 Server running at: http://localhost:${PORT}`);
-      console.log("📡 Ready to accept requests from frontend!");
+      console.log(`🚀 Server is live on port ${PORT}`);
+      console.log("🌐 Frontend allowed origins:");
+      allowedOrigins.forEach((o) => console.log("  - " + o));
+      console.log("📡 Ready to accept requests from JobMela frontend!");
     });
   } catch (error) {
     console.error("❌ Failed to start server:", error);
