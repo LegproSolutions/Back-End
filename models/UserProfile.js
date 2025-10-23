@@ -26,7 +26,7 @@ const userProfileSchema = new mongoose.Schema({
   lastName: { type: String },
   middleName: { type: String },
   email: { type: String, unique: true },
-  phone: { type: String, unique: true },
+  phone: { type: String },
   // Do NOT index non-required fields to avoid E11000 on null/undefined values
   alternatePhone: { type: String },
   dateOfBirth: { type: Date },
