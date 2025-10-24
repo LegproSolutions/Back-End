@@ -577,6 +577,11 @@ export const updateJobByAdmin = async (req, res) => {
       "employmentType",
       "requirements",
       "visible",
+      // allow admin to change job's company reference and optional company location overrides
+      "companyId",
+      "companyCity",
+      "companyState",
+      "companyCountry",
     ];
 
     const update = {};
@@ -592,6 +597,54 @@ export const updateJobByAdmin = async (req, res) => {
     if (update.requirements && !Array.isArray(update.requirements)) {
       update.requirements = [update.requirements];
     }
+
+    // If companyId provided, derive companyDetails from the Company doc and any overrides provided
+    if (body.companyId) {
+      const companyDoc = await Company.findById(body.companyId);
+      if (!companyDoc) {
+        return res.status(404).json({ success: false, message: "Selected company not found" });
+      }
+
+      update.companyId = body.companyId;
+      update.companyDetails = {
+        name: companyDoc.name,
+        shortDescription: body.shortDescription || companyDoc.shortDescription || `${companyDoc.name} is a leading company`,
+        city: body.companyCity || companyDoc.city || "",
+        state: body.companyState || companyDoc.state || "",
+        country: body.companyCountry || companyDoc.country || "",
+        hrName: body.hrName || companyDoc.name,
+        hrEmail: body.hrEmail || companyDoc.email,
+        hrPhone: body.hrPhone || companyDoc.phone,
+      };
+    }
+
+    // Ensure companyDetails is present for validation: if not changed by the request, reuse existing values
+    const existingJob = await Job.findById(jobId).lean();
+    if (!existingJob) {
+      return res.status(404).json({ success: false, message: "Job not found" });
+    }
+
+    if (!update.companyDetails) {
+      // Merge any flat overrides (companyCity/companyState/companyCountry/shortDescription/hr fields) onto existing companyDetails
+      update.companyDetails = {
+        name: existingJob.companyDetails?.name || "",
+        shortDescription: body.shortDescription || existingJob.companyDetails?.shortDescription || `${existingJob.companyDetails?.name || 'Company'} is a leading company`,
+        city: body.companyCity || existingJob.companyDetails?.city || "",
+        state: body.companyState || existingJob.companyDetails?.state || "",
+        country: body.companyCountry || existingJob.companyDetails?.country || "",
+        hrName: body.hrName || existingJob.companyDetails?.hrName || "",
+        hrEmail: body.hrEmail || existingJob.companyDetails?.hrEmail || "",
+        hrPhone: body.hrPhone || existingJob.companyDetails?.hrPhone || "",
+      };
+    }
+
+    // Remove any flat company* fields from update to avoid storing unexpected fields
+    delete update.companyCity;
+    delete update.companyState;
+    delete update.companyCountry;
+    delete update.hrName;
+    delete update.hrEmail;
+    delete update.hrPhone;
 
     const updatedJob = await Job.findByIdAndUpdate(jobId, update, {
       new: true,
