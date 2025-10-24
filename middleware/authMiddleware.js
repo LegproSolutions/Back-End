@@ -3,14 +3,26 @@ import Company from "../models/Company.js";
 import User from "../models/User.js";
 import Admin from "../models/Admin.js";
 
-// Utility function to extract token from request (Authorization header fallback)
+// Utility function to extract token from request (prefer httpOnly cookie for server-issued tokens)
 const extractToken = (req) => {
-  // Prefer Authorization Bearer if present
-  if (req.headers?.authorization?.startsWith('Bearer ')) {
-    return req.headers.authorization.split(' ')[1];
+  // Prefer httpOnly cookie issued by this backend
+  const cookieToken = req.cookies?.token;
+  if (cookieToken && cookieToken !== 'undefined' && cookieToken !== 'null') {
+    req.tokenSource = 'cookie';
+    return cookieToken;
   }
-  // Fallback to httpOnly cookie
-  return req.cookies?.token;
+
+  // Fallback to Authorization Bearer header
+  const authHeader = req.headers?.authorization;
+  if (authHeader?.startsWith('Bearer ')) {
+    const headerToken = authHeader.split(' ')[1];
+    if (headerToken && headerToken !== 'undefined' && headerToken !== 'null') {
+      req.tokenSource = 'authorization';
+      return headerToken;
+    }
+  }
+
+  return undefined;
 };
 
 // Generic authentication middleware
@@ -28,8 +40,10 @@ const createAuthMiddleware = (Model, tokenKey = 'id') => {
     }
 
     try {
-      // Verify token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      // Verify token (explicitly restrict algorithm)
+      const decoded = jwt.verify(token, process.env.JWT_SECRET, {
+        algorithms: ['HS256'],
+      });
 
       // Find entity in database
       const entity = await Model.findById(decoded[tokenKey]).select("-password");
@@ -49,9 +63,12 @@ const createAuthMiddleware = (Model, tokenKey = 'id') => {
     } catch (error) {
       // Detailed error handling
       if (error.name === 'JsonWebTokenError') {
+        // Differentiate invalid signature vs other JWT format issues
+        const reason = error.message === 'invalid signature' ? 'Invalid token signature' : 'Invalid token';
+        console.log('Authentication error (JWT):', { reason, source: req.tokenSource });
         return res.status(401).json({ 
           success: false, 
-          message: "Invalid token format" 
+          message: reason 
         });
       }
       
