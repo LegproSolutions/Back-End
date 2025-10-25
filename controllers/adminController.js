@@ -276,12 +276,14 @@ export const createJobByAdmin = async (req, res) => {
       };
     } else {
       // Create new company if it doesn't exist
-      const existingCompany = await Company.findOne({ 
-        $or: [
-          { email: companyEmail },
-          { name: companyName }
-        ]
-      });
+      let existingCompany = null;
+      if (companyId) {
+        existingCompany = await Company.findById(companyId);
+      } else {
+        // Normalize companyName for search
+        const normalizedName = (companyName || "").trim().toLowerCase();
+        existingCompany = await Company.findOne({ name: { $regex: `^${normalizedName}$`, $options: "i" } });
+      }
 
       if (existingCompany) {
         // Use existing company
