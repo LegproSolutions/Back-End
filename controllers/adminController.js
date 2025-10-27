@@ -3,7 +3,6 @@ import Admin from "../models/Admin.js";
 import jwt from "jsonwebtoken";
 import Company from "../models/Company.js";
 import Job from "../models/Job.js";
-import User from "../models/User.js";
 import UserProfile from "../models/UserProfile.js";
 import JobApplication from "../models/JobApplication.js";
 import mongoose from "mongoose";
@@ -285,7 +284,12 @@ export const createJobByAdmin = async (req, res) => {
         existingCompany = await Company.findOne({ name: { $regex: `^${normalizedName}$`, $options: "i" } });
       }
 
-      if (existingCompany) {
+      // Only use existing company if both name and email match
+      if (
+        existingCompany &&
+        existingCompany.name.trim().toLowerCase() === (companyName || "").trim().toLowerCase() &&
+        existingCompany.email.trim().toLowerCase() === (companyEmail || "").trim().toLowerCase()
+      ) {
         // Use existing company
         finalCompanyId = existingCompany._id;
         finalCompanyDetails = {
@@ -299,23 +303,12 @@ export const createJobByAdmin = async (req, res) => {
           hrPhone: hrPhone || existingCompany.phone
         };
       } else {
-        // Create new company
+        // Create new company (even if email matches, if name is different)
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(companyPassword || 'DefaultPass123!', salt);
 
         // Upload logo to Cloudinary if provided
         let imageUrl = 'https://cdn.iconscout.com/icon/premium/png-256-thumb/building-icon-svg-download-png-1208046.png?f=webp&w=128';
-        if (file && file.buffer) {
-          const uploadRes = await cloudinary.uploader.upload_stream(
-            { folder: 'companies', resource_type: 'image' },
-            (error, result) => {
-              if (error) throw error;
-            }
-          );
-          // Using promise wrapper for upload_stream
-        }
-
-        // cloudinary upload_stream needs a promise wrapper; fallback to upload if file.path exists (disk storage not used here)
         if (file && file.buffer) {
           const uploadResult = await new Promise((resolve, reject) => {
             const stream = cloudinary.uploader.upload_stream({ folder: 'companies', resource_type: 'image' }, (err, result) => {
@@ -366,6 +359,8 @@ export const createJobByAdmin = async (req, res) => {
       employmentType,
       companyId: finalCompanyId,
       companyDetails: finalCompanyDetails,
+      // Track which admin created this job (primary admin or sub-admin)
+      createdBy: req.admin?._id,
       visible: true,
       isVerified: true, // Auto-verify since admin is creating
       isViewApplicant: false
@@ -405,6 +400,27 @@ export const getAllCompanies = async (req, res) => {
       success: false,
       message: error.message
     });
+  }
+};
+
+// Get jobs for admin dashboard. If admin is a sub-admin, return only jobs created by them.
+export const getAdminJobs = async (req, res) => {
+  try {
+    const admin = req.admin;
+    const filter = {};
+
+    if (admin && admin.role === 'sub-admin') {
+      filter.createdBy = admin._id;
+    }
+
+    const jobs = await Job.find(filter)
+      .populate({ path: 'companyId', select: '-password' })
+      .sort({ date: -1 });
+
+    return res.json({ success: true, jobs });
+  } catch (error) {
+    console.error('Error fetching admin jobs:', error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -769,3 +785,89 @@ export const getJobApplicationStats = async (req, res) => {
   }
 };
 
+export const createSubAdmin = async (req, res) => {
+  const { name, email, password } = req.body;
+
+  if (!name || !email || !password) {
+    return res.json({ success: false, message: "Missing Details" });
+  }
+
+  try {
+    // Check if Admin already exists
+    const AdminExists = await Admin.findOne({ email }).lean();
+    if (AdminExists) {
+      return res.json({
+        success: false,
+        message: "Admin already registered",
+      });
+    }
+
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashPassword = await bcrypt.hash(password, salt);
+
+    // Create Admin
+    const admin = await Admin.create({
+      name,
+      email,
+      password: hashPassword,
+      role: 'sub-admin'
+    });
+
+    res.json({
+      success: true,
+      admin: {
+        _id: admin._id,
+        name: admin.name,
+        email: admin.email,
+        role: admin.role
+      },
+      message: "Sub-Admin created successfully",
+    });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+export const getAllSubAdmins = async (req, res) => {
+  try {
+    const subAdmins = await Admin.find({ role: 'sub-admin' }).select("-password").lean();
+    res.status(200).json({ success: true, subAdmins });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const deleteSubAdmin = async (req, res) => {
+  try {
+    const { subAdminId } = req.params;
+
+    // Validate subAdminId
+    if (!mongoose.isValidObjectId(subAdminId)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid Sub-Admin ID" 
+      });
+    }
+
+    const deletedSubAdmin = await Admin.findOneAndDelete({ _id: subAdminId, role: 'sub-admin' });
+
+    if (!deletedSubAdmin) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Sub-Admin not found" 
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Sub-Admin deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting Sub-Admin:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
+  }
+};

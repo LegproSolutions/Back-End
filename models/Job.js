@@ -15,6 +15,9 @@ const jobSchema = new mongoose.Schema({
     requirements: [{ type: String }],
     employmentType:{type:String ,enum:["full-time", "part-time", "internship","unpaid"],required:true},
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: "Company", required: true },
+
+    // Track which admin (primary or sub-admin) created this job
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" },
     
     companyDetails: {
         name: { type: String, required: true },

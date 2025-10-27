@@ -15,6 +15,9 @@ import {
   updateJobByAdmin,
   getJobApplicationStats,
   changeApplicationStatus,
+  createSubAdmin,
+  getAllSubAdmins,
+  deleteSubAdmin,
 } from "../controllers/adminController.js";
 import { protectAdmin } from "../middleware/authMiddleware.js";
 import upload from "../config/multer.js";
@@ -30,6 +33,22 @@ router.get("/admin", protectAdmin, getAdminData);
 // Admin job creation routes (accept companyImage file)
 router.post("/create-job", protectAdmin, upload.single('companyImage'), createJobByAdmin);
 router.get("/companies", protectAdmin, getAllCompanies);
+
+// Admin jobs listing (primary admin sees all jobs; sub-admin sees only their created jobs)
+router.get("/jobs", protectAdmin, async (req, res, next) => {
+  // forward to controller implementation
+  try {
+    const controller = await import('../controllers/adminController.js');
+    return controller.getAdminJobs(req, res);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Sub-Admin management (only accessible to primary admin)
+router.post("/sub-admin", protectAdmin, createSubAdmin);
+router.get("/sub-admins", protectAdmin, getAllSubAdmins);
+router.delete("/sub-admins/:subAdminId", protectAdmin, deleteSubAdmin);
 
 // User management routes
 router.get("/all-users", protectAdmin, allUser);
