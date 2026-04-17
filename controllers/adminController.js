@@ -11,6 +11,7 @@ import multer from "multer";
 import csv from "csv-parser";
 import stream from "stream";
 import Candidate from "../models/Candidate.js";
+import User from "../models/User.js";
 // Direct admin credentials constant
 const DIRECT_ADMIN = {
   name: "Admin Abhisek",
@@ -237,6 +238,7 @@ export const createJobByAdmin = async (req, res) => {
     const salary = body.salary;
     const openings = body.openings;
     const employmentType = body.employmentType;
+    const qualification = body.qualification;
     const requirements = body.requirements ? (Array.isArray(body.requirements) ? body.requirements : [body.requirements]) : [];
 
     // Company details
@@ -360,6 +362,7 @@ export const createJobByAdmin = async (req, res) => {
       date: new Date(),
       requirements: Array.isArray(requirements) ? requirements : [requirements],
       employmentType,
+      qualification,
       companyId: finalCompanyId,
       companyDetails: finalCompanyDetails,
       // Track which admin created this job (primary admin or sub-admin)
@@ -597,6 +600,7 @@ export const updateJobByAdmin = async (req, res) => {
       "openings",
       "employmentType",
       "requirements",
+      "qualification",
       "visible",
       // allow admin to change job's company reference and optional company location overrides
       "companyId",
@@ -911,5 +915,97 @@ export const uploadCandidatesCSV = async (req, res) => {
 
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+// Bulk upload Users
+export const uploadUsersCSV = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "CSV file required" });
+    }
+
+    const results = [];
+    const bufferStream = new stream.PassThrough();
+    bufferStream.end(req.file.buffer);
+
+    bufferStream
+      .pipe(csv())
+      .on("data", (data) => {
+        if (data && Object.keys(data).length > 0) {
+          results.push(data);
+        }
+      })
+      .on("error", (err) => {
+        console.error("CSV Parsing error:", err);
+        return res.status(500).json({ success: false, message: "Error parsing CSV file" });
+      })
+      .on("end", async () => {
+        let insertedCount = 0;
+        let skippedCount = 0;
+
+        for (const row of results) {
+          try {
+            const email = (row.email || row.Email || row.EMAIL || "").trim().toLowerCase();
+            if (!email) {
+              skippedCount++;
+              continue;
+            }
+
+            // Check existing in User or UserProfile model to avoid unique index collisions
+            const [existingUser, existingProfile] = await Promise.all([
+              User.findOne({ email }),
+              UserProfile.findOne({ email })
+            ]);
+
+            if (existingUser || existingProfile) {
+              skippedCount++;
+              continue;
+            }
+
+            const firstName = (row.firstName || row.FirstName || row.first_name || row["First Name"] || "").trim();
+            const lastName = (row.lastName || row.LastName || row.last_name || row["Last Name"] || "").trim();
+            const name = (firstName + " " + lastName).trim() || row.name || row.Name || row.NAME || "User";
+            const phone = (row.phone || row.Phone || row.PHONE || "").trim();
+
+            // Create User (Auth record)
+            const salt = await bcrypt.genSalt(10);
+            const hashedPassword = await bcrypt.hash("JobMela@123", salt);
+
+            const user = await User.create({
+              name,
+              email,
+              phone,
+              password: hashedPassword
+            });
+
+            // Create UserProfile (Detailed record used in Admin panel)
+            await UserProfile.create({
+              userId: user._id,
+              firstName,
+              lastName,
+              email,
+              phone,
+              createdAt: new Date()
+            });
+
+            insertedCount++;
+          } catch (err) {
+            console.error("Bulk upload processing error for row:", row, err);
+            skippedCount++;
+          }
+        }
+
+        res.json({
+          success: true,
+          message: `Upload complete. ${insertedCount} users successfully added. ${skippedCount > 0 ? skippedCount + " rows skipped (duplicate email or invalid data)." : ""}`,
+          insertedCount,
+          skippedCount
+        });
+      });
+
+  } catch (error) {
+    console.error("Upload Users CSV error:", error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };

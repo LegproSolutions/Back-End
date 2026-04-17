@@ -15,7 +15,8 @@ export const getJobs = async (req, res) => {
       salaryMin,
       salaryMax,
       experience,
-      states, // New parameter for state filtering
+      states,
+      qualification,
     } = req.query;
 
     // Convert page and limit to numbers
@@ -64,6 +65,10 @@ export const getJobs = async (req, res) => {
       filter.experience = { $gte: parseInt(experience) };
     }
 
+    if (qualification && qualification !== "") {
+      filter.qualification = { $regex: qualification, $options: "i" };
+    }
+
     // Create cache key based on all filters
     const cacheKey = `jobs_${JSON.stringify({
       page: pageNum,
@@ -75,6 +80,7 @@ export const getJobs = async (req, res) => {
       salaryMax,
       experience,
       states,
+      qualification,
     })}`.replace(/[^a-zA-Z0-9]/g, "_");
 
     // Redis disabled for now

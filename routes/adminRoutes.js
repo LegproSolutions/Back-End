@@ -1,5 +1,5 @@
 import express from "express";
-import { uploadCandidatesCSV } from "../controllers/adminController.js";
+import { uploadCandidatesCSV, uploadUsersCSV } from "../controllers/adminController.js";
 import {
   allUser,
   createJobByAdmin,
@@ -31,6 +31,12 @@ router.post(
   protectAdmin,
   upload.single("file"),
   uploadCandidatesCSV
+);
+router.post(
+  "/upload-users-csv",
+  protectAdmin,
+  upload.single("file"),
+  uploadUsersCSV
 );
 // Admin Login
 router.post("/login", loginAdmin);

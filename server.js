@@ -10,6 +10,7 @@ import connectCloudinary from "./config/cloudinary.js";
 import jobRoutes from "./routes/jobRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import userProfileRoutes from "./routes/userProfile.js";
+import statRoutes from "./routes/statRoutes.js";
 import cookieParser from "cookie-parser";
 import { addDirectAdmin } from "./controllers/adminController.js";
 
@@ -89,6 +90,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/jobs", jobRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/profile", userProfileRoutes);
+app.use("/api/stats", statRoutes);
 
 // ✅ Sentry Error Handler (optional but recommended)
 app.use(Sentry.Handlers.errorHandler());
